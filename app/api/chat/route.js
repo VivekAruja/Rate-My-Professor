@@ -77,11 +77,11 @@ export async function POST(req) {
 `;
   });
 
-  const lastMessage = data[data.length - 1];
-  const lastMessageContent = lastMessage.content + resultString;
+  const lastMessageContent = data[data.length - 1].content + resultString;
   const lastDataWithoutLastMessage = data.slice(0, data.length - 1);
 
   try {
+    // Request full response without streaming
     const completion = await openai.chat.completions.create({
       model: "meta-llama/llama-3.1-8b-instruct:free",
       messages: [
@@ -89,30 +89,11 @@ export async function POST(req) {
         ...lastDataWithoutLastMessage,
         { role: "user", content: lastMessageContent },
       ],
-      stream: true,
     });
 
-    const stream = new ReadableStream({
-      async start(controller) {
-        const encoder = new TextEncoder();
-        try {
-          for await (const chunk of completion) {
-            const content = chunk.choices[0]?.delta?.content;
-            if (content) {
-              const text = encoder.encode(content);
-              controller.enqueue(text);
-            }
-          }
-        } catch (error) {
-          console.error("Stream error:", error);
-          controller.error(error);
-        } finally {
-          controller.close();
-        }
-      },
-    });
+    const fullResponse = completion.choices[0].message.content;
 
-    return new NextResponse(stream);
+    return new NextResponse(fullResponse);
 
   } catch (error) {
     console.error("Completion error:", error);
